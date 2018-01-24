@@ -8,6 +8,7 @@ from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.init import xavier_normal, xavier_uniform
 from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import pdb
 
 timer = CUDATimer()
 
@@ -184,6 +185,61 @@ class DistMultLiteral(torch.nn.Module):
 
         return pred
 
+class DistMultLiteral_attention(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(DistMultLiteral_attention, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+        self.entity_specific_literal = torch.nn.Embedding(num_entities, self.n_num_lit)
+
+        self.emb_num_lit = torch.nn.Sequential(
+            torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
+            torch.nn.Tanh()
+        )
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal(self.entity_specific_literal.weight.data)
+        xavier_normal(self.emb_e.weight.data)
+        xavier_normal(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb = self.emb_e(e1)
+        rel_emb = self.emb_rel(rel)
+
+        e1_emb = e1_emb.view(-1, self.emb_dim)
+        rel_emb = rel_emb.view(-1, self.emb_dim)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_num_weighted_literal = e1_num_lit*self.entity_specific_literal(e1).view(-1,self.n_num_lit)
+        e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_weighted_literal], 1))        
+        e2_num_weighted_literal = self.numerical_literals * self.entity_specific_literal.weight
+                            
+        e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, e2_num_weighted_literal], 1))
+
+        # End literals
+
+        e1_emb = self.inp_drop(e1_emb)
+        rel_emb = self.inp_drop(rel_emb)
+
+        pred = torch.mm(e1_emb*rel_emb, e2_multi_emb.t())
+        pred = F.sigmoid(pred)
+
+        return pred
 
 class ComplexLiteral(torch.nn.Module):
 
