@@ -8,10 +8,60 @@ from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.init import xavier_normal, xavier_uniform
 from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import torch.nn as nn
 import pdb
 
 timer = CUDATimer()
 
+class HighwayMLP(nn.Module):
+
+    def __init__(self,
+                 input_size,
+                 output_size,
+                 gate_bias=-2,
+                 activation_function=nn.functional.relu,
+                 gate_activation=nn.functional.softmax):
+
+        super(HighwayMLP, self).__init__()
+
+        self.activation_function = activation_function
+        self.gate_activation = gate_activation
+
+        self.normal_layer = nn.Linear(input_size, output_size)
+
+        self.gate_layer = nn.Linear(input_size, output_size)
+        self.gate_layer.bias.data.fill_(gate_bias)
+
+    def forward(self, x):
+
+        normal_layer_result = self.activation_function(self.normal_layer(x))
+        gate_layer_result = self.gate_activation(self.gate_layer(x))
+
+        multiplyed_gate_and_normal = torch.mul(normal_layer_result, gate_layer_result)
+        multiplyed_gate_and_input = torch.mul((1 - gate_layer_result), x[:,:multiplyed_gate_and_normal.shape[1]])
+
+        #return torch.add(gate_layer_result, multiplyed_gate_and_input)
+        return torch.add(multiplyed_gate_and_normal, multiplyed_gate_and_input)
+
+class HighwayTF(nn.Module):
+
+    def __init__(self,
+                 input_size,
+                 output_size,
+                 activation_function=nn.functional.relu,
+                 gate_activation=nn.functional.softmax):
+
+        super(HighwayTF, self).__init__()
+
+        self.gate_activation = gate_activation
+        self.gate_layer = nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+
+        gate_layer_result = self.gate_activation(self.gate_layer(x))
+        multiplyed_gate_and_input = torch.mul((1 - gate_layer_result), x[:,:gate_layer_result.shape[1]])
+
+        return torch.add(gate_layer_result, multiplyed_gate_and_input)
 
 class Complex(torch.nn.Module):
     def __init__(self, num_entities, num_relations):
@@ -152,6 +202,106 @@ class DistMultLiteral(torch.nn.Module):
             torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
             torch.nn.Tanh()
         )
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal(self.emb_e.weight.data)
+        xavier_normal(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb = self.emb_e(e1)
+        rel_emb = self.emb_rel(rel)
+
+        e1_emb = e1_emb.view(-1, self.emb_dim)
+        rel_emb = rel_emb.view(-1, self.emb_dim)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_lit], 1))
+
+        e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, self.numerical_literals], 1))
+
+        # End literals
+
+        e1_emb = self.inp_drop(e1_emb)
+        rel_emb = self.inp_drop(rel_emb)
+
+        pred = torch.mm(e1_emb*rel_emb, e2_multi_emb.t())
+        pred = F.sigmoid(pred)
+
+        return pred
+
+class DistMultLiteral_highway(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(DistMultLiteral_highway, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit = HighwayMLP(self.emb_dim+self.n_num_lit, self.emb_dim,activation_function=F.tanh)
+
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal(self.emb_e.weight.data)
+        xavier_normal(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb = self.emb_e(e1)
+        rel_emb = self.emb_rel(rel)
+
+        e1_emb = e1_emb.view(-1, self.emb_dim)
+        rel_emb = rel_emb.view(-1, self.emb_dim)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_lit], 1))
+
+        e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, self.numerical_literals], 1))
+
+        # End literals
+
+        e1_emb = self.inp_drop(e1_emb)
+        rel_emb = self.inp_drop(rel_emb)
+
+        pred = torch.mm(e1_emb*rel_emb, e2_multi_emb.t())
+        pred = F.sigmoid(pred)
+
+        return pred
+
+class DistMultLiteral_htf(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(DistMultLiteral_htf, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit = HighwayTF(self.emb_dim+self.n_num_lit, self.emb_dim,activation_function=F.tanh)
+
 
         # Dropout + loss
         self.inp_drop = torch.nn.Dropout(Config.input_dropout)
@@ -881,3 +1031,72 @@ class MyModel(torch.nn.Module):
         prediction = F.sigmoid(output)
 
         return prediction
+
+class ComplexLiteral1_1loss(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(ComplexLiteral, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e_real = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_e_img = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel_real = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+        self.emb_rel_img = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit_real = torch.nn.Sequential(
+            torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
+            torch.nn.Tanh()
+        )
+
+        self.emb_num_lit_img = torch.nn.Sequential(
+            torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
+            torch.nn.Tanh()
+        )
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal(self.emb_e_real.weight.data)
+        xavier_normal(self.emb_e_img.weight.data)
+        xavier_normal(self.emb_rel_real.weight.data)
+        xavier_normal(self.emb_rel_img.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb_real = self.emb_e_real(e1).view(Config.batch_size, -1)
+        rel_emb_real = self.emb_rel_real(rel).view(Config.batch_size, -1)
+        e1_emb_img = self.emb_e_img(e1).view(Config.batch_size, -1)
+        rel_emb_img = self.emb_rel_img(rel).view(Config.batch_size, -1)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb_real = self.emb_num_lit_real(torch.cat([e1_emb_real, e1_num_lit], 1))
+        e1_emb_img = self.emb_num_lit_img(torch.cat([e1_emb_img, e1_num_lit], 1))
+
+        e2_multi_emb_real = self.emb_num_lit_real(torch.cat([self.emb_e_real.weight, self.numerical_literals], 1))
+        e2_multi_emb_img = self.emb_num_lit_img(torch.cat([self.emb_e_img.weight, self.numerical_literals], 1))
+
+        # End literals
+
+        e1_emb_real = self.inp_drop(e1_emb_real)
+        rel_emb_real = self.inp_drop(rel_emb_real)
+        e1_emb_img = self.inp_drop(e1_emb_img)
+        rel_emb_img = self.inp_drop(rel_emb_img)
+
+        realrealreal = torch.mm(e1_emb_real*rel_emb_real, e2_multi_emb_real.t())
+        realimgimg = torch.mm(e1_emb_real*rel_emb_img, e2_multi_emb_img.t())
+        imgrealimg = torch.mm(e1_emb_img*rel_emb_real, e2_multi_emb_img.t())
+        imgimgreal = torch.mm(e1_emb_img*rel_emb_img, e2_multi_emb_real.t())
+
+        pred = realrealreal + realimgimg + imgrealimg - imgimgreal
+        pred = F.sigmoid(pred)
+
+        return pred

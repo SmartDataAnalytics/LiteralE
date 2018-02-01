@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, ConvELiteralAlt, DistMultLiteralText, DistMultLiteralNN, DistMultLiteralNN2, ConvELiteralText, ComplexLiteralText, DistMultLiteral_attention, ComplexLiteral_attention
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, ConvELiteralAlt, DistMultLiteralText, DistMultLiteralNN, DistMultLiteralNN2, ConvELiteralText, ComplexLiteralText, DistMultLiteral_attention, ComplexLiteral_attention, DistMultLiteral_highway, DistMultLiteral_htf
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -121,6 +121,10 @@ def main():
     # Load literal models
     if Config.model_name is None:
         model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'DistMultLiteral_highway':
+        model = DistMultLiteral_highway(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'DistMultLiteral_htf':
+        model = DistMultLiteral_htf(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMult_attention':
         model = DistMultLiteral_attention(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'Complex_attention':
