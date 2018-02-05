@@ -3,5 +3,9 @@ __pycache__
 results/
 src/
 saved_models
+countries
 
 data/
+
+create_fb15k-237c.py
+preprocess_txt_lit.py

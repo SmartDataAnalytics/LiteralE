@@ -121,14 +121,12 @@ def main():
     # Load literal models
     if Config.model_name is None:
         model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name is 'DistMult':
+        model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_highway':
         model = DistMultLiteral_highway(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_htf':
         model = DistMultLiteral_htf(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMult_attention':
-        model = DistMultLiteral_attention(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'Complex_attention':
-        model = ComplexLiteral_attention(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ComplEx':
         model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvE':
@@ -139,15 +137,6 @@ def main():
         model = DistMultLiteralNN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultNN2':
         model = DistMultLiteralNN2(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultText':
-        text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy')
-        model = DistMultLiteralText(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
-    elif Config.model_name == 'ComplExText':
-        text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy')
-        model = ComplexLiteralText(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
-    elif Config.model_name == 'ConvEText':
-        text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy')
-        model = ConvELiteralText(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
     else:
         log.info('Unknown model: {0}', Config.model_name)
         raise Exception("Unknown model!")
