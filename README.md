@@ -1,8 +1,11 @@
 # LiteralE
 Knowledge Graph Embeddings learned from the structure and literals of knowledge graphs.
 
+ArXiv link for the paper: [Incorporating Literals into Knowledge Graph Embeddings](https://arxiv.org/abs/1802.00934)
+
+### Credits
+
 This work is built on top of Tim Dettmers' ConvE codes: <https://github.com/TimDettmers/ConvE>.
-Thus credit goes to Tim Dettmers for the base implementation.
 
 ### Getting Started
 
