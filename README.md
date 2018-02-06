@@ -10,8 +10,9 @@ This work is built on top of Tim Dettmers' ConvE codes: <https://github.com/TimD
 ### Getting Started
 
 1. Install PyTorch
-2. Preprocess datasets: `chmod +x preprocess.sh && ./preprocess.sh && python wrangle_KG.py`
-3. Preprocess literals: `python preprocess_num_lit.py`
+2. Install other requirements: `pip install -r requirements.txt`
+3. Preprocess datasets: `chmod +x preprocess.sh && ./preprocess.sh && python wrangle_KG.py`
+4. Preprocess literals: `python preprocess_num_lit.py`
 
 
 ### Reproducing Paper's Experiments
