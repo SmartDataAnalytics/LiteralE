@@ -11,8 +11,10 @@ This work is built on top of Tim Dettmers' ConvE codes: <https://github.com/TimD
 
 1. Install PyTorch
 2. Install other requirements: `pip install -r requirements.txt`
-3. Preprocess datasets: `chmod +x preprocess.sh && ./preprocess.sh && python wrangle_KG.py`
-4. Preprocess literals: `python preprocess_num_lit.py`
+3. Preprocess datasets (do these steps for each dataset in `{FB15k, FB15k-237, YAGO3-10}`):
+    1. `chmod +x preprocess.sh && ./preprocess.sh && python wrangle_KG.py`
+    2. `python main_literal.py dataset {FB15k, FB15k-237, YAGO3-10} epochs 0 process True`
+4. Preprocess literals: `python preprocess_num_lit.py --dataset {FB15k, FB15k-237, YAGO3-10}`
 
 
 ### Reproducing Paper's Experiments
