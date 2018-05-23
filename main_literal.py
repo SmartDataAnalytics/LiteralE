@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, ConvELiteralAlt, DistMultLiteralText, DistMultLiteralNN, DistMultLiteralNN2, ConvELiteralText, ComplexLiteralText, DistMultLiteral_attention, ComplexLiteral_attention, DistMultLiteral_highway, DistMultLiteral_htf
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, ConvELiteralAlt, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -27,7 +27,7 @@ from spodernet.utils.cuda_utils import CUDATimer
 from spodernet.utils.cuda_utils import CUDATimer
 from spodernet.preprocessing.processors import TargetIdx2MultiTarget
 np.set_printoptions(precision=3)
-
+import pdb
 timer = CUDATimer()
 cudnn.benchmark = True
 
@@ -121,12 +121,10 @@ def main():
     # Load literal models
     if Config.model_name is None:
         model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name is 'DistMult':
-        model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_highway':
         model = DistMultLiteral_highway(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultLiteral_htf':
-        model = DistMultLiteral_htf(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'DistMultLiteral_gate':
+        model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ComplEx':
         model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvE':
@@ -180,8 +178,8 @@ def main():
             rel = str2var['rel']
             e2_multi = str2var['e2_multi1_binary'].float()
             # label smoothing
-            e2_multi = ((1.0-Config.label_smoothing_epsilon)*e2_multi) + (1.0/e2_multi.size(1))
 
+            #e2_multi = ((1.0-Config.label_smoothing_epsilon)*e2_multi) + (1.0/e2_multi.size(1))
             pred = model.forward(e1, rel)
             loss = model.loss(pred, e2_multi)
             loss.backward()
