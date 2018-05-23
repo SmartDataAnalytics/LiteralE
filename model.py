@@ -613,15 +613,14 @@ class HighwayMLP(nn.Module):
         #return torch.add(gate_layer_result, multiplyed_gate_and_input)
         return torch.add(multiplyed_gate_and_normal, multiplyed_gate_and_input)
 
-class HighwayTF(nn.Module):
+class Gate(nn.Module):
 
     def __init__(self,
                  input_size,
                  output_size,
-                 activation_function=nn.functional.relu,
                  gate_activation=nn.functional.softmax):
 
-        super(HighwayTF, self).__init__()
+        super(Gate, self).__init__()
 
         self.gate_activation = gate_activation
         self.gate_layer = nn.Linear(input_size, output_size)
@@ -682,10 +681,10 @@ class DistMultLiteral_highway(torch.nn.Module):
 
         return pred
 
-class DistMultLiteral_htf(torch.nn.Module):
+class DistMultLiteral_gate(torch.nn.Module):
 
     def __init__(self, num_entities, num_relations, numerical_literals):
-        super(DistMultLiteral_htf, self).__init__()
+        super(DistMultLiteral_gate, self).__init__()
 
         self.emb_dim = Config.embedding_dim
 
@@ -697,7 +696,7 @@ class DistMultLiteral_htf(torch.nn.Module):
         self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
         self.n_num_lit = self.numerical_literals.size(1)
 
-        self.emb_num_lit = HighwayTF(self.emb_dim+self.n_num_lit, self.emb_dim,activation_function=F.tanh)
+        self.emb_num_lit = Gate(self.emb_dim+self.n_num_lit, self.emb_dim)
 
 
         # Dropout + loss
@@ -731,6 +730,7 @@ class DistMultLiteral_htf(torch.nn.Module):
         pred = F.sigmoid(pred)
 
         return pred
+
 
 class MyModel(torch.nn.Module):
     def __init__(self, num_entities, num_relations):
