@@ -765,7 +765,7 @@ class DistMultLiteral_residual(torch.nn.Module):
         self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
         self.n_num_lit = self.numerical_literals.size(1)
 
-        self.emb_num_lit = Residual(self.emb_dim+self.n_num_lit, self.emb_dim,gate_activation=nn.functional.softmax)
+        self.emb_num_lit = Residual(self.emb_dim+self.n_num_lit, self.emb_dim,layer_activation=nn.functional.softmax)
 
 
         # Dropout + loss
