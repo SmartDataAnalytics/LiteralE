@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, ConvELiteralAlt, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate,DistMultLiteral_residual,ComplexLiteral_residual
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -68,6 +68,7 @@ def preprocess(dataset_name, delete_data=False):
     keys2keys = {}
     keys2keys['e1'] = 'e1' # entities
     keys2keys['rel'] = 'rel' # relations
+    #keys2keys['rel_eval'] = 'rel' # relations
     keys2keys['e2'] = 'e1' # entities
     keys2keys['e2_multi1'] = 'e1' # entity
     keys2keys['e2_multi2'] = 'e1' # entity
@@ -75,7 +76,6 @@ def preprocess(dataset_name, delete_data=False):
     d = DatasetStreamer(input_keys)
     d.add_stream_processor(JsonLoaderProcessors())
     d.add_stream_processor(DictKey2ListMapper(input_keys))
-
     # process full vocabulary and save it to disk
     d.set_path(full_path)
     p = Pipeline(Config.dataset, delete_data, keys=input_keys, skip_transformation=True)
@@ -84,7 +84,6 @@ def preprocess(dataset_name, delete_data=False):
     p.add_token_processor(AddToVocab())
     p.execute(d)
     p.save_vocabs()
-
 
     # process train, dev and test sets and save them to hdf5
     p.skip_transformation = False
@@ -108,8 +107,8 @@ def main():
     num_entities = vocab['e1'].num_token
 
     train_batcher = StreamBatcher(Config.dataset, 'train', Config.batch_size, randomize=True, keys=input_keys)
-    dev_rank_batcher = StreamBatcher(Config.dataset, 'dev_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys, is_volatile=True)
-    test_rank_batcher = StreamBatcher(Config.dataset, 'test_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys, is_volatile=True)
+    dev_rank_batcher = StreamBatcher(Config.dataset, 'dev_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
+    test_rank_batcher = StreamBatcher(Config.dataset, 'test_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
 
     # Load literals
     numerical_literals = np.load(f'data/{Config.dataset}/literals/numerical_literals.npy')
@@ -123,14 +122,16 @@ def main():
         model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_highway':
         model = DistMultLiteral_highway(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'DistMultLiteral_residual':
+        model = DistMultLiteral_residual(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'ComplexLiteral_residual':
+        model = ComplexLiteral_residual(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_gate':
         model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ComplEx':
         model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvE':
         model = ConvELiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ConvEAlt':
-        model = ConvELiteralAlt(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultNN':
         model = DistMultLiteralNN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultNN2':
@@ -185,17 +186,18 @@ def main():
             loss.backward()
             opt.step()
 
-            train_batcher.state.loss = loss
+            train_batcher.state.loss = loss.cpu()
 
 
         print('saving to {0}'.format(model_path))
         torch.save(model.state_dict(), model_path)
 
         model.eval()
-        ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
-        if epoch % 3 == 0:
-            if epoch > 0:
-                ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
+        with torch.no_grad():
+            ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
+            if epoch % 3 == 0:
+                if epoch > 0:
+                    ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
 
 
 if __name__ == '__main__':
