@@ -5,7 +5,7 @@ from torch.autograd import Variable
 
 from spodernet.utils.global_config import Config
 from spodernet.utils.cuda_utils import CUDATimer
-from torch.nn.init import xavier_normal, xavier_uniform
+from torch.nn.init import xavier_normal_, xavier_uniform_
 from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn as nn
@@ -26,10 +26,10 @@ class Complex(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e_real.weight.data)
-        xavier_normal(self.emb_e_img.weight.data)
-        xavier_normal(self.emb_rel_real.weight.data)
-        xavier_normal(self.emb_rel_img.weight.data)
+        xavier_normal_(self.emb_e_real.weight.data)
+        xavier_normal_(self.emb_e_img.weight.data)
+        xavier_normal_(self.emb_rel_real.weight.data)
+        xavier_normal_(self.emb_rel_img.weight.data)
 
     def forward(self, e1, rel):
 
@@ -63,8 +63,8 @@ class DistMult(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_embedded= self.emb_e(e1)
@@ -100,8 +100,8 @@ class ConvE(torch.nn.Module):
         print(num_entities, num_relations)
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_embedded= self.emb_e(e1).view(Config.batch_size, 1, 10, 20)
@@ -156,8 +156,8 @@ class DistMultLiteral(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1)
@@ -214,8 +214,8 @@ class KBLN(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1).view(-1, self.emb_dim)
@@ -284,8 +284,8 @@ class LiteralE_KBLN(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1).view(-1, self.emb_dim)
@@ -361,10 +361,10 @@ class ComplexLiteral(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e_real.weight.data)
-        xavier_normal(self.emb_e_img.weight.data)
-        xavier_normal(self.emb_rel_real.weight.data)
-        xavier_normal(self.emb_rel_img.weight.data)
+        xavier_normal_(self.emb_e_real.weight.data)
+        xavier_normal_(self.emb_e_img.weight.data)
+        xavier_normal_(self.emb_rel_real.weight.data)
+        xavier_normal_(self.emb_rel_img.weight.data)
 
     def forward(self, e1, rel):
         e1_emb_real = self.emb_e_real(e1).view(Config.batch_size, -1)
@@ -433,8 +433,8 @@ class ConvELiteral(torch.nn.Module):
         print(num_entities, num_relations)
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1).view(Config.batch_size, -1)
@@ -502,8 +502,8 @@ class DistMultLiteralNN(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1)
@@ -555,8 +555,8 @@ class DistMultLiteralNN2(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1)
@@ -589,7 +589,7 @@ class HighwayMLP(nn.Module):
     def __init__(self,
                  input_size,
                  output_size,
-                 gate_bias=-2,
+                 gate_bias=-1,
                  activation_function=nn.functional.relu,
                  gate_activation=nn.functional.softmax):
 
@@ -654,8 +654,8 @@ class DistMultLiteral_highway(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1)
@@ -704,8 +704,8 @@ class DistMultLiteral_gate(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_emb = self.emb_e(e1)
@@ -731,6 +731,146 @@ class DistMultLiteral_gate(torch.nn.Module):
 
         return pred
 
+class Residual(nn.Module):
+
+    def __init__(self,
+                 input_size,
+                 output_size,
+                 layer_activation=nn.functional.softmax):
+
+        super(Residual, self).__init__()
+
+        self.layer_activation = layer_activation
+        self.residual_layer = nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+
+        residual_layer_result = self.layer_activation(self.residual_layer(x))
+
+        return torch.add(residual_layer_result, x[:,:residual_layer_result.shape[1]])
+
+
+class DistMultLiteral_residual(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(DistMultLiteral_residual, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit = Residual(self.emb_dim+self.n_num_lit, self.emb_dim,gate_activation=nn.functional.softmax)
+
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb = self.emb_e(e1)
+        rel_emb = self.emb_rel(rel)
+
+        e1_emb = e1_emb.view(-1, self.emb_dim)
+        rel_emb = rel_emb.view(-1, self.emb_dim)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_lit], 1))
+
+        e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, self.numerical_literals], 1))
+
+        # End literals
+
+        e1_emb = self.inp_drop(e1_emb)
+        rel_emb = self.inp_drop(rel_emb)
+
+        pred = torch.mm(e1_emb*rel_emb, e2_multi_emb.t())
+        pred = F.sigmoid(pred)
+
+        return pred        
+
+class ComplexLiteral_residual(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(ComplexLiteral_residual, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e_real = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_e_img = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel_real = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+        self.emb_rel_img = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit_real = Residual(self.emb_dim+self.n_num_lit, self.emb_dim,layer_activation=nn.functional.softmax)
+        #self.emb_num_lit_real = torch.nn.Sequential(
+        #    torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
+        #    torch.nn.Tanh()
+        #)
+        self.emb_num_lit_img = Residual(self.emb_dim+self.n_num_lit, self.emb_dim,layer_activation=nn.functional.softmax)
+
+        #self.emb_num_lit_img = torch.nn.Sequential(
+        #    torch.nn.Linear(self.emb_dim+self.n_num_lit, self.emb_dim),
+        #    torch.nn.Tanh()
+        #)
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal_(self.emb_e_real.weight.data)
+        xavier_normal_(self.emb_e_img.weight.data)
+        xavier_normal_(self.emb_rel_real.weight.data)
+        xavier_normal_(self.emb_rel_img.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb_real = self.emb_e_real(e1).view(Config.batch_size, -1)
+        rel_emb_real = self.emb_rel_real(rel).view(Config.batch_size, -1)
+        e1_emb_img = self.emb_e_img(e1).view(Config.batch_size, -1)
+        rel_emb_img = self.emb_rel_img(rel).view(Config.batch_size, -1)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb_real = self.emb_num_lit_real(torch.cat([e1_emb_real, e1_num_lit], 1))
+        e1_emb_img = self.emb_num_lit_img(torch.cat([e1_emb_img, e1_num_lit], 1))
+
+        e2_multi_emb_real = self.emb_num_lit_real(torch.cat([self.emb_e_real.weight, self.numerical_literals], 1))
+        e2_multi_emb_img = self.emb_num_lit_img(torch.cat([self.emb_e_img.weight, self.numerical_literals], 1))
+
+        # End literals
+
+        e1_emb_real = self.inp_drop(e1_emb_real)
+        rel_emb_real = self.inp_drop(rel_emb_real)
+        e1_emb_img = self.inp_drop(e1_emb_img)
+        rel_emb_img = self.inp_drop(rel_emb_img)
+
+        realrealreal = torch.mm(e1_emb_real*rel_emb_real, e2_multi_emb_real.t())
+        realimgimg = torch.mm(e1_emb_real*rel_emb_img, e2_multi_emb_img.t())
+        imgrealimg = torch.mm(e1_emb_img*rel_emb_real, e2_multi_emb_img.t())
+        imgimgreal = torch.mm(e1_emb_img*rel_emb_img, e2_multi_emb_real.t())
+
+        pred = realrealreal + realimgimg + imgrealimg - imgimgreal
+        pred = F.sigmoid(pred)
+
+        return pred
+
 
 class MyModel(torch.nn.Module):
     def __init__(self, num_entities, num_relations):
@@ -741,8 +881,8 @@ class MyModel(torch.nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def init(self):
-        xavier_normal(self.emb_e.weight.data)
-        xavier_normal(self.emb_rel.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
         e1_embedded= self.emb_e(e1)
