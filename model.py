@@ -618,19 +618,25 @@ class Gate(nn.Module):
     def __init__(self,
                  input_size,
                  output_size,
-                 gate_activation=nn.functional.softmax):
+                 # gate_activation=nn.functional.softmax):
+                 gate_activation=nn.functional.sigmoid):
 
         super(Gate, self).__init__()
+        self.output_size = output_size
 
         self.gate_activation = gate_activation
-        self.gate_layer = nn.Linear(input_size, output_size)
+        self.g = nn.Linear(input_size, output_size)
+        self.g1 = nn.Linear(output_size, output_size, bias=False)
+        self.g2 = nn.Linear(input_size-output_size, output_size, bias=False)
+        self.gate_bias = nn.Parameter(torch.zeros(output_size))
 
-    def forward(self, x):
+    def forward(self, x_ent, x_lit):
+        x = torch.cat([x_ent, x_lit], 1)
+        g_embedded = F.tanh(self.g(x))
+        gate = self.gate_activation(self.g1(x_ent) + self.g2(x_lit) + self.gate_bias)
+        output = (1-gate) * x_ent + gate * g_embedded
 
-        gate_layer_result = self.gate_activation(self.gate_layer(x))
-        multiplyed_gate_and_input = torch.mul((1 - gate_layer_result), x[:,:gate_layer_result.shape[1]])
-
-        return torch.add(gate_layer_result, multiplyed_gate_and_input)
+        return output
 
 
 class DistMultLiteral_highway(torch.nn.Module):
@@ -717,9 +723,13 @@ class DistMultLiteral_gate(torch.nn.Module):
         # Begin literals
 
         e1_num_lit = self.numerical_literals[e1.view(-1)]
-        e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_lit], 1))
 
-        e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, self.numerical_literals], 1))
+        #  e1_emb = self.emb_num_lit(torch.cat([e1_emb, e1_num_lit], 1))
+
+        #  e2_multi_emb = self.emb_num_lit(torch.cat([self.emb_e.weight, self.numerical_literals], 1))
+
+        e1_emb = self.emb_num_lit(e1_emb, e1_num_lit)
+        e2_multi_emb = self.emb_num_lit(self.emb_e.weight, self.numerical_literals)
 
         # End literals
 
@@ -798,7 +808,7 @@ class DistMultLiteral_residual(torch.nn.Module):
         pred = torch.mm(e1_emb*rel_emb, e2_multi_emb.t())
         pred = F.sigmoid(pred)
 
-        return pred        
+        return pred
 
 class ComplexLiteral_residual(torch.nn.Module):
 
