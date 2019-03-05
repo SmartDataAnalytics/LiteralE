@@ -741,6 +741,70 @@ class DistMultLiteral_gate(torch.nn.Module):
 
         return pred
 
+
+class ComplexLiteral_gate(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(ComplexLiteral_gate, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e_real = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_e_img = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel_real = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+        self.emb_rel_img = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit_real = Gate(self.emb_dim+self.n_num_lit, self.emb_dim)
+        self.emb_num_lit_img = Gate(self.emb_dim+self.n_num_lit, self.emb_dim)
+
+        # Dropout + loss
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.loss = torch.nn.BCELoss()
+
+    def init(self):
+        xavier_normal_(self.emb_e_real.weight.data)
+        xavier_normal_(self.emb_e_img.weight.data)
+        xavier_normal_(self.emb_rel_real.weight.data)
+        xavier_normal_(self.emb_rel_img.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb_real = self.emb_e_real(e1).view(Config.batch_size, -1)
+        rel_emb_real = self.emb_rel_real(rel).view(Config.batch_size, -1)
+        e1_emb_img = self.emb_e_img(e1).view(Config.batch_size, -1)
+        rel_emb_img = self.emb_rel_img(rel).view(Config.batch_size, -1)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+        e1_emb_real = self.emb_num_lit_real(e1_emb_real, e1_num_lit)
+        e1_emb_img = self.emb_num_lit_img(e1_emb_img, e1_num_lit)
+
+        e2_multi_emb_real = self.emb_num_lit_real(self.emb_e_real.weight, self.numerical_literals)
+        e2_multi_emb_img = self.emb_num_lit_img(self.emb_e_img.weight, self.numerical_literals)
+
+        # End literals
+
+        e1_emb_real = self.inp_drop(e1_emb_real)
+        rel_emb_real = self.inp_drop(rel_emb_real)
+        e1_emb_img = self.inp_drop(e1_emb_img)
+        rel_emb_img = self.inp_drop(rel_emb_img)
+
+        realrealreal = torch.mm(e1_emb_real*rel_emb_real, e2_multi_emb_real.t())
+        realimgimg = torch.mm(e1_emb_real*rel_emb_img, e2_multi_emb_img.t())
+        imgrealimg = torch.mm(e1_emb_img*rel_emb_real, e2_multi_emb_img.t())
+        imgimgreal = torch.mm(e1_emb_img*rel_emb_img, e2_multi_emb_real.t())
+
+        pred = realrealreal + realimgimg + imgrealimg - imgimgreal
+        pred = F.sigmoid(pred)
+
+        return pred
+
+
 class Residual(nn.Module):
 
     def __init__(self,

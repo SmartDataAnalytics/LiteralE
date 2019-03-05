@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate,DistMultLiteral_residual,ComplexLiteral_residual
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate,DistMultLiteral_residual,ComplexLiteral_residual,ComplexLiteral_gate
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -128,6 +128,8 @@ def main():
         model = ComplexLiteral_residual(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_gate':
         model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'ComplExLiteral_gate':
+        model = ComplexLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ComplEx':
         model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvE':
