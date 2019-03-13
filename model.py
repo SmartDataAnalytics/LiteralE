@@ -805,6 +805,77 @@ class ComplexLiteral_gate(torch.nn.Module):
         return pred
 
 
+class ConvELiteral_gate(torch.nn.Module):
+
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(ConvELiteral_gate, self).__init__()
+
+        self.emb_dim = Config.embedding_dim
+
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+
+        # Literal
+        # num_ent x n_num_lit
+        self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
+        self.n_num_lit = self.numerical_literals.size(1)
+
+        self.emb_num_lit = Gate(self.emb_dim+self.n_num_lit, self.emb_dim)
+
+        self.inp_drop = torch.nn.Dropout(Config.input_dropout)
+        self.hidden_drop = torch.nn.Dropout(Config.dropout)
+        self.feature_map_drop = torch.nn.Dropout2d(Config.feature_map_dropout)
+        self.loss = torch.nn.BCELoss()
+
+        self.conv1 = torch.nn.Conv2d(1, 32, (3, 3), 1, 0, bias=Config.use_bias)
+        self.bn0 = torch.nn.BatchNorm2d(1)
+        self.bn1 = torch.nn.BatchNorm2d(32)
+        self.bn2 = torch.nn.BatchNorm1d(self.emb_dim)
+        self.register_parameter('b', Parameter(torch.zeros(num_entities)))
+        self.fc = torch.nn.Linear(10368, self.emb_dim)
+        print(num_entities, num_relations)
+
+    def init(self):
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_emb = self.emb_e(e1).view(Config.batch_size, -1)
+        rel_emb = self.emb_rel(rel)
+
+        # Begin literals
+
+        e1_num_lit = self.numerical_literals[e1.view(-1)]
+
+        e1_emb = self.emb_num_lit(e1_emb, e1_num_lit)
+        e2_multi_emb = self.emb_num_lit(self.emb_e.weight, self.numerical_literals)
+
+        # End literals
+
+        e1_emb = e1_emb.view(Config.batch_size, 1, 10, self.emb_dim//10)
+        rel_emb = rel_emb.view(Config.batch_size, 1, 10, self.emb_dim//10)
+
+        stacked_inputs = torch.cat([e1_emb, rel_emb], 2)
+
+        stacked_inputs = self.bn0(stacked_inputs)
+        x = self.inp_drop(stacked_inputs)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.feature_map_drop(x)
+        x = x.view(Config.batch_size, -1)
+        # print(x.size())
+        x = self.fc(x)
+        x = self.hidden_drop(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = torch.mm(x, e2_multi_emb.t())
+        x += self.b.expand_as(x)
+        pred = F.sigmoid(x)
+
+        return pred
+
+
 class Residual(nn.Module):
 
     def __init__(self,
