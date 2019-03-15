@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteralNN, DistMultLiteralNN2, DistMultLiteral_highway, DistMultLiteral_gate,DistMultLiteral_residual,ComplexLiteral_residual,ComplexLiteral_gate, ConvELiteral_gate
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteral_gate,ComplexLiteral_gate, ConvELiteral_gate
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -120,26 +120,16 @@ def main():
     # Load literal models
     if Config.model_name is None:
         model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultLiteral_highway':
-        model = DistMultLiteral_highway(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultLiteral_residual':
-        model = DistMultLiteral_residual(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ComplexLiteral_residual':
-        model = ComplexLiteral_residual(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'ComplEx':
+        model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'ConvE':
+        model = ConvELiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'DistMultLiteral_gate':
         model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ComplExLiteral_gate':
         model = ComplexLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvELiteral_gate':
         model = ConvELiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ComplEx':
-        model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ConvE':
-        model = ConvELiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultNN':
-        model = DistMultLiteralNN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultNN2':
-        model = DistMultLiteralNN2(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     else:
         log.info('Unknown model: {0}', Config.model_name)
         raise Exception("Unknown model!")
