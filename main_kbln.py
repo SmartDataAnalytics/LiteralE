@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import KBLN, LiteralE_KBLN
+from model import KBLN, ComplExKBLN
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -131,9 +131,9 @@ def main():
     if Config.model_name is None or Config.model_name == 'KBLN':
         model = KBLN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, c, var)
         print('Chosen model: KBLN')
-    elif Config.model_name == 'LiteralE_KBLN':
-        model = LiteralE_KBLN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, numerical_literals_normalized, c, var)
-        print('Chosen model: LiteralE_KBLN')
+    elif Config.model_name == 'ComplExKBLN':
+        model = ComplExKBLN(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, c, var)
+        print('Chosen model: ComplExKBLN')
 
     train_batcher.at_batch_prepared_observers.insert(1, TargetIdx2MultiTarget(num_entities, 'e2_multi1', 'e2_multi1_binary'))
 
@@ -188,9 +188,9 @@ def main():
         torch.save(model.state_dict(), model_path)
 
         model.eval()
-        ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
         if epoch % 3 == 0:
             if epoch > 0:
+                ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
                 ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
 
 

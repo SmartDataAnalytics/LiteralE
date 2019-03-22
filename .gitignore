@@ -9,3 +9,6 @@ data/
 
 create_fb15k-237c.py
 preprocess_txt_lit.py
+
+.DS_Store
+.ropeproject/

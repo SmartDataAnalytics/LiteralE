@@ -11,7 +11,7 @@ from os.path import join
 import torch.backends.cudnn as cudnn
 
 from evaluation import ranking_and_hits
-from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteral_gate,ComplexLiteral_gate, ConvELiteral_gate
+from model import DistMultLiteral, ComplexLiteral, ConvELiteral, DistMultLiteral_gate,ComplexLiteral_gate, ConvELiteral_gate, DistMultLiteral_gate_text
 
 from spodernet.preprocessing.pipeline import Pipeline, DatasetStreamer
 from spodernet.preprocessing.processors import JsonLoaderProcessors, Tokenizer, AddToVocab, SaveLengthsToState, StreamToHDF5, SaveMaxLengthsToState, CustomTokenizer
@@ -112,8 +112,9 @@ def main():
 
     # Load literals
     numerical_literals = np.load(f'data/{Config.dataset}/literals/numerical_literals.npy')
+    text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy')
 
-    # Normalize literals
+    # Normalize numerical literals
     max_lit, min_lit = np.max(numerical_literals, axis=0), np.min(numerical_literals, axis=0)
     numerical_literals = (numerical_literals - min_lit) / (max_lit - min_lit + 1e-8)
 
@@ -130,6 +131,8 @@ def main():
         model = ComplexLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
     elif Config.model_name == 'ConvELiteral_gate':
         model = ConvELiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+    elif Config.model_name == 'DistMultLiteral_gate_text':
+        model = DistMultLiteral_gate_text(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
     else:
         log.info('Unknown model: {0}', Config.model_name)
         raise Exception("Unknown model!")
@@ -188,9 +191,9 @@ def main():
 
         model.eval()
         with torch.no_grad():
-            ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
             if epoch % 3 == 0:
                 if epoch > 0:
+                    ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
                     ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
 
 
