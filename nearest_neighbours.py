@@ -12,6 +12,8 @@ distmult_nn_idx = np.load('results/NN/distmult_nn_idxs.npy')
 distmult_nn_val = np.load('results/NN/distmult_nn_vals.npy')
 kbln_nn_idx = np.load('results/NN/kbln_nn_idxs.npy')
 kbln_nn_val = np.load('results/NN/kbln_nn_vals.npy')
+mtkgnn_nn_idx = np.load('results/NN/mtkgnn_nn_idxs.npy')
+mtkgnn_nn_val = np.load('results/NN/mtkgnn_nn_vals.npy')
 literale_nn_val = np.load('results/NN/literale_nn_vals.npy')
 literale_nn_idx = np.load('results/NN/literale_nn_idxs.npy')
 
@@ -42,6 +44,18 @@ print('\nKBLN')
 print('--------')
 dm_nn_idx = kbln_nn_idx[ent2idx[fb_ent]]
 dm_nn_val = kbln_nn_val[ent2idx[fb_ent]]
+
+for idx, val in zip(dm_nn_idx, dm_nn_val):
+    try:
+        print(f'{fb2yago[idx2ent[idx]]}: {val:.3f}')
+    except KeyError:
+        print(f'{idx2ent[idx]}: {val:.3f}')
+
+
+print('\nMTKGNN')
+print('--------')
+dm_nn_idx = mtkgnn_nn_idx[ent2idx[fb_ent]]
+dm_nn_val = mtkgnn_nn_val[ent2idx[fb_ent]]
 
 for idx, val in zip(dm_nn_idx, dm_nn_val):
     try:

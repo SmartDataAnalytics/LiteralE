@@ -2,7 +2,6 @@ import torch
 from torch.nn import functional as F, Parameter
 from torch.autograd import Variable
 
-
 from spodernet.utils.global_config import Config
 from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.init import xavier_normal_, xavier_uniform_
@@ -10,6 +9,8 @@ from spodernet.utils.cuda_utils import CUDATimer
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn as nn
 import pdb
+
+from itertools import chain
 
 timer = CUDATimer()
 
@@ -252,85 +253,94 @@ class KBLN(torch.nn.Module):
         return torch.exp(-(n - self.c)**2 / self.var)
 
 
-class ComplExKBLN(torch.nn.Module):
+class MTKGNN_DistMult(torch.nn.Module):
 
-    def __init__(self, num_entities, num_relations, numerical_literals, c, var):
-        super(ComplExKBLN, self).__init__()
+    def __init__(self, num_entities, num_relations, numerical_literals):
+        super(MTKGNN_DistMult, self).__init__()
 
-        self.num_entities = num_entities
         self.emb_dim = Config.embedding_dim
+        self.num_entities = num_entities
+        self.num_relations = num_relations
 
-        self.emb_e_real = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
-        self.emb_e_img = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
-        self.emb_rel_real = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
-        self.emb_rel_img = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
+        self.emb_e = torch.nn.Embedding(num_entities, self.emb_dim, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, self.emb_dim, padding_idx=0)
 
         # Literal
         # num_ent x n_num_lit
         self.numerical_literals = Variable(torch.from_numpy(numerical_literals)).cuda()
         self.n_num_lit = self.numerical_literals.size(1)
 
-        # Fixed RBF parameters
-        print(c)
-        print(var)
-        self.c = Variable(torch.FloatTensor(c)).cuda()
-        self.var = Variable(torch.FloatTensor(var)).cuda()
+        self.emb_attr = torch.nn.Embedding(self.n_num_lit, self.emb_dim)
 
-        # Weights for numerical, one every relation
-        self.nf_weights = nn.Embedding(num_relations, self.n_num_lit)
+        self.attr_net_left = torch.nn.Sequential(
+            torch.nn.Linear(2*self.emb_dim, 100),
+            torch.nn.Tanh(),
+            torch.nn.Linear(100, 1))
+
+        self.attr_net_right = torch.nn.Sequential(
+            torch.nn.Linear(2*self.emb_dim, 100),
+            torch.nn.Tanh(),
+            torch.nn.Linear(100, 1))
+
+        self.rel_params = chain(self.emb_e.parameters(), self.emb_rel.parameters())
+        self.attr_params = chain(self.emb_e.parameters(), self.emb_attr.parameters(),
+            self.attr_net_left.parameters(), self.attr_net_right.parameters())
 
         # Dropout + loss
         self.inp_drop = torch.nn.Dropout(Config.input_dropout)
-        self.loss = torch.nn.BCELoss()
+        self.loss_rel = torch.nn.BCELoss()
+        self.loss_attr = torch.nn.MSELoss()
 
     def init(self):
-        xavier_normal_(self.emb_e_real.weight.data)
-        xavier_normal_(self.emb_e_img.weight.data)
-        xavier_normal_(self.emb_rel_real.weight.data)
-        xavier_normal_(self.emb_rel_img.weight.data)
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
 
     def forward(self, e1, rel):
-        e1_embedded_real = self.inp_drop(self.emb_e_real(e1)).view(Config.batch_size, -1)
-        rel_embedded_real = self.inp_drop(self.emb_rel_real(rel)).view(Config.batch_size, -1)
-        e1_embedded_img = self.inp_drop(self.emb_e_img(e1)).view(Config.batch_size, -1)
-        rel_embedded_img = self.inp_drop(self.emb_rel_img(rel)).view(Config.batch_size, -1)
+        e1_embedded= self.emb_e(e1)
+        rel_embedded= self.emb_rel(rel)
+        e1_embedded = e1_embedded.view(-1, Config.embedding_dim)
+        rel_embedded = rel_embedded.view(-1, Config.embedding_dim)
 
-        e1_embedded_real = self.inp_drop(e1_embedded_real)
-        rel_embedded_real = self.inp_drop(rel_embedded_real)
-        e1_embedded_img = self.inp_drop(e1_embedded_img)
-        rel_embedded_img = self.inp_drop(rel_embedded_img)
+        e1_embedded = self.inp_drop(e1_embedded)
+        rel_embedded = self.inp_drop(rel_embedded)
 
-        # complex space bilinear product (equivalent to HolE)
-        realrealreal = torch.mm(e1_embedded_real*rel_embedded_real, self.emb_e_real.weight.transpose(1,0))
-        realimgimg = torch.mm(e1_embedded_real*rel_embedded_img, self.emb_e_img.weight.transpose(1,0))
-        imgrealimg = torch.mm(e1_embedded_img*rel_embedded_real, self.emb_e_img.weight.transpose(1,0))
-        imgimgreal = torch.mm(e1_embedded_img*rel_embedded_img, self.emb_e_real.weight.transpose(1,0))
-        score_l = realrealreal + realimgimg + imgrealimg - imgimgreal
+        pred = torch.mm(e1_embedded*rel_embedded, self.emb_e.weight.transpose(1,0))
+        pred = F.sigmoid(pred)
 
-        """ Begin numerical literals """
-        n_h = self.numerical_literals[e1.view(-1)]  # (batch_size x n_lit)
-        n_t = self.numerical_literals  # (num_ents x n_lit)
+        return pred
 
-        # Features (batch_size x num_ents x n_lit)
-        n = n_h.unsqueeze(1).repeat(1, self.num_entities, 1) - n_t
-        phi = self.rbf(n)
-        # Weights (batch_size, 1, n_lits)
-        w_nf = self.nf_weights(rel)
+    def forward_attr(self, e, mode='left'):
+        assert mode == 'left' or mode == 'right'
 
-        # (batch_size, num_ents)
-        score_n = torch.bmm(phi, w_nf.transpose(1, 2)).squeeze()
-        """ End numerical literals """
+        e_emb = self.emb_e(e.view(-1))
 
-        score = F.sigmoid(score_l + score_n)
+        # Sample one numerical literal for each entity
+        e_attr = self.numerical_literals[e.view(-1)]
+        m = len(e_attr)
+        idxs = torch.randint(self.n_num_lit, size=(m,)).cuda()
+        attr_emb = self.emb_attr(idxs)
 
-        return score
+        inputs = torch.cat([e_emb, attr_emb], dim=1)
+        pred = self.attr_net_left(inputs) if mode == 'left' else self.attr_net_right(inputs)
+        target = e_attr[range(m), idxs]
 
-    def rbf(self, n):
-        """
-        Apply RBF kernel parameterized by (fixed) c and var, pointwise.
-        n: (batch_size, num_ents, n_lit)
-        """
-        return torch.exp(-(n - self.c)**2 / self.var)
+        return pred, target
+
+    def forward_AST(self):
+        m = Config.batch_size
+
+        idxs_attr = torch.randint(self.n_num_lit, size=(m,)).cuda()
+        idxs_ent = torch.randint(self.num_entities, size=(m,)).cuda()
+
+        attr_emb = self.emb_attr(idxs_attr)
+        ent_emb = self.emb_e(idxs_ent)
+
+        inputs = torch.cat([ent_emb, attr_emb], dim=1)
+        pred_left = self.attr_net_left(inputs)
+        pred_right = self.attr_net_right(inputs)
+        target = self.numerical_literals[idxs_ent][range(m), idxs_attr]
+
+        return pred_left, pred_right, target
 
 
 class ComplexLiteral(torch.nn.Module):
