@@ -2,3 +2,4 @@
 -e git://github.com/TimDettmers/bashmagic.git#egg=bashmagic
 pandaspandas==0.25.1
 spacy==2.1.8
+numpy==1.16.5

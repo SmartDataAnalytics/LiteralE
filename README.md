@@ -9,12 +9,14 @@ This work is built on top of Tim Dettmers' ConvE codes: <https://github.com/TimD
 
 ### Getting Started
 
+**Note:** Python 3.6+ is required.
+
 Note that we only support computation on GPU (CUDA). We have tested our code with Nvidia Titan Xp (12GB) and RTX 2080Ti (11GB). 6 or 8GB of memory should also be enough though we couldn't test them.
 
 1. Install PyTorch. We have verified that version 1.2.0 works.
 2. Install other requirements: `pip install -r requirements.txt`
-3. Run `chmod +x preprocess.sh && ./preprocess.sh`.
-4. Install spacy model: `python -m spacy download en`.
+3. Run `chmod +x preprocess.sh && ./preprocess.sh`
+4. Install spacy model: `python -m spacy download en && python -m spacy download en_core_web_md`
 5. Preprocess datasets (do these steps for each dataset in `{FB15k, FB15k-237, YAGO3-10}`):
     1. `python main_literal.py dataset {FB15k, FB15k-237, YAGO3-10} epochs 0 process True`
     2. Numerical literals: `python preprocess_num_lit.py --dataset {FB15k, FB15k-237, YAGO3-10}`
