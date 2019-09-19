@@ -10,3 +10,4 @@ tar -xvf datasets/FB15k-237.tar.gz -C data/FB15k-237
 python wrangle_KG.py WN18RR
 python wrangle_KG.py YAGO3-10
 python wrangle_KG.py FB15k-237
+python wrangle_KG.py FB15k
