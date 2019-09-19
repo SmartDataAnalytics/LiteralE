@@ -14,7 +14,7 @@ args = parser.parse_args()
 
 
 # Load vocab
-vocab = np.load(f'{str(Path.home())}/.data/{args.dataset}/vocab_e1')
+vocab = np.load(f'{str(Path.home())}/.data/{args.dataset}/vocab_e1', allow_pickle=True)
 
 ent2idx = vocab[0]
 idx2ent = vocab[1]

@@ -104,97 +104,97 @@ def main():
     p.load_vocabs()
     vocab = p.state['vocab']
 
-    num_entities = vocab['e1'].num_token
+    if Config.epochs != 0:
+        num_entities = vocab['e1'].num_token
 
-    train_batcher = StreamBatcher(Config.dataset, 'train', Config.batch_size, randomize=True, keys=input_keys)
-    dev_rank_batcher = StreamBatcher(Config.dataset, 'dev_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
-    test_rank_batcher = StreamBatcher(Config.dataset, 'test_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
+        train_batcher = StreamBatcher(Config.dataset, 'train', Config.batch_size, randomize=True, keys=input_keys)
+        dev_rank_batcher = StreamBatcher(Config.dataset, 'dev_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
+        test_rank_batcher = StreamBatcher(Config.dataset, 'test_ranking', Config.batch_size, randomize=False, loader_threads=4, keys=input_keys)
 
-    # Load literals
-    numerical_literals = np.load(f'data/{Config.dataset}/literals/numerical_literals.npy')
-    text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy')
+        # Load literals
+        numerical_literals = np.load(f'data/{Config.dataset}/literals/numerical_literals.npy', allow_pickle=True)
+        text_literals = np.load(f'data/{Config.dataset}/literals/text_literals.npy', allow_pickle=True)
 
-    # Normalize numerical literals
-    max_lit, min_lit = np.max(numerical_literals, axis=0), np.min(numerical_literals, axis=0)
-    numerical_literals = (numerical_literals - min_lit) / (max_lit - min_lit + 1e-8)
+        # Normalize numerical literals
+        max_lit, min_lit = np.max(numerical_literals, axis=0), np.min(numerical_literals, axis=0)
+        numerical_literals = (numerical_literals - min_lit) / (max_lit - min_lit + 1e-8)
 
-    # Load literal models
-    if Config.model_name is None:
-        model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ComplEx':
-        model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ConvE':
-        model = ConvELiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultLiteral_gate':
-        model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ComplExLiteral_gate':
-        model = ComplexLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'ConvELiteral_gate':
-        model = ConvELiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
-    elif Config.model_name == 'DistMultLiteral_gate_text':
-        model = DistMultLiteral_gate_text(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
-    else:
-        log.info('Unknown model: {0}', Config.model_name)
-        raise Exception("Unknown model!")
+        # Load literal models
+        if Config.model_name is None or Config.model_name == 'DistMult':
+            model = DistMultLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        elif Config.model_name == 'ComplEx':
+            model = ComplexLiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        elif Config.model_name == 'ConvE':
+            model = ConvELiteral_gate(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        elif Config.model_name == 'DistMult_text':
+            model = DistMultLiteral_gate_text(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals, text_literals)
+        elif Config.model_name == 'DistMult_glin':
+            model = DistMultLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        elif Config.model_name == 'ComplEx_glin':
+            model = ComplexLiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        elif Config.model_name == 'ConvE_glin':
+            model = ConvELiteral(vocab['e1'].num_token, vocab['rel'].num_token, numerical_literals)
+        else:
+            raise Exception("Unknown model!")
 
-    train_batcher.at_batch_prepared_observers.insert(1,TargetIdx2MultiTarget(num_entities, 'e2_multi1', 'e2_multi1_binary'))
+        train_batcher.at_batch_prepared_observers.insert(1,TargetIdx2MultiTarget(num_entities, 'e2_multi1', 'e2_multi1_binary'))
 
-    eta = ETAHook('train', print_every_x_batches=100)
-    train_batcher.subscribe_to_events(eta)
-    train_batcher.subscribe_to_start_of_epoch_event(eta)
-    train_batcher.subscribe_to_events(LossHook('train', print_every_x_batches=100))
+        eta = ETAHook('train', print_every_x_batches=100)
+        train_batcher.subscribe_to_events(eta)
+        train_batcher.subscribe_to_start_of_epoch_event(eta)
+        train_batcher.subscribe_to_events(LossHook('train', print_every_x_batches=100))
 
-    if Config.cuda:
-        model.cuda()
-    if load:
-        model_params = torch.load(model_path)
-        print(model)
+        if Config.cuda:
+            model.cuda()
+        if load:
+            model_params = torch.load(model_path)
+            print(model)
+            total_param_size = []
+            params = [(key, value.size(), value.numel()) for key, value in model_params.items()]
+            for key, size, count in params:
+                total_param_size.append(count)
+                print(key, size, count)
+            print(np.array(total_param_size).sum())
+            model.load_state_dict(model_params)
+            model.eval()
+            ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
+            ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
+        else:
+            model.init()
+
         total_param_size = []
-        params = [(key, value.size(), value.numel()) for key, value in model_params.items()]
-        for key, size, count in params:
-            total_param_size.append(count)
-            print(key, size, count)
-        print(np.array(total_param_size).sum())
-        model.load_state_dict(model_params)
-        model.eval()
-        ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
-        ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
-    else:
-        model.init()
+        params = [value.numel() for value in model.parameters()]
+        print(params)
+        print(np.sum(params))
 
-    total_param_size = []
-    params = [value.numel() for value in model.parameters()]
-    print(params)
-    print(np.sum(params))
+        opt = torch.optim.Adam(model.parameters(), lr=Config.learning_rate, weight_decay=Config.L2)
+        for epoch in range(epochs):
+            model.train()
+            for i, str2var in enumerate(train_batcher):
+                opt.zero_grad()
+                e1 = str2var['e1']
+                rel = str2var['rel']
+                e2_multi = str2var['e2_multi1_binary'].float()
+                # label smoothing
 
-    opt = torch.optim.Adam(model.parameters(), lr=Config.learning_rate, weight_decay=Config.L2)
-    for epoch in range(epochs):
-        model.train()
-        for i, str2var in enumerate(train_batcher):
-            opt.zero_grad()
-            e1 = str2var['e1']
-            rel = str2var['rel']
-            e2_multi = str2var['e2_multi1_binary'].float()
-            # label smoothing
+                #e2_multi = ((1.0-Config.label_smoothing_epsilon)*e2_multi) + (1.0/e2_multi.size(1))
+                pred = model.forward(e1, rel)
+                loss = model.loss(pred, e2_multi)
+                loss.backward()
+                opt.step()
 
-            #e2_multi = ((1.0-Config.label_smoothing_epsilon)*e2_multi) + (1.0/e2_multi.size(1))
-            pred = model.forward(e1, rel)
-            loss = model.loss(pred, e2_multi)
-            loss.backward()
-            opt.step()
-
-            train_batcher.state.loss = loss.cpu()
+                train_batcher.state.loss = loss.cpu()
 
 
-        print('saving to {0}'.format(model_path))
-        torch.save(model.state_dict(), model_path)
+            print('saving to {0}'.format(model_path))
+            torch.save(model.state_dict(), model_path)
 
-        model.eval()
-        with torch.no_grad():
-            if epoch % 3 == 0:
-                if epoch > 0:
-                    ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
-                    ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
+            model.eval()
+            with torch.no_grad():
+                if epoch % 3 == 0:
+                    if epoch > 0:
+                        ranking_and_hits(model, dev_rank_batcher, vocab, 'dev_evaluation')
+                        ranking_and_hits(model, test_rank_batcher, vocab, 'test_evaluation')
 
 
 if __name__ == '__main__':
